@@ -6,6 +6,7 @@ extern "C" {
     #include <string.h>
     #include <uv.h>
     #include <roboticscape.h>
+    #include <node/v8.h>
 }
 
 typedef void (*void_fp)();
