@@ -12,8 +12,10 @@ extern "C" {
 typedef void (*void_fp)();
 
 namespace rc {
+    using namespace v8;
+
     void RCinitialize(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-        v8::Local<v8::Boolean> i = Nan::New((bool)rc_initialize());
+        Local<Boolean> i = Nan::New((bool)rc_initialize());
         rc_disable_signal_handler();
         info.GetReturnValue().Set(i);
     }
@@ -23,7 +25,7 @@ namespace rc {
         rc_cleanup();
     }
 
-    void RCstate(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+    void RCstate(const Nan::FunctionCallbackInfo<Value>& info) {
         if (info.Length() == 0) {
             rc_state_t s = rc_get_state();
             switch(s) {
@@ -50,9 +52,12 @@ namespace rc {
         if (!info[0]->IsString()) {
             Nan::ThrowTypeError("Wrong type (should be string)");
             return;
-        }
-        v8::String::Utf8Value str(info[0]->ToString());
+        } else {
+
+        Nan::Utf8String str(info[0]);
+
         char * s = (char *)*str;
+        
         if (!strcmp(s, "RUNNING")) rc_set_state(RUNNING);
         else if (!strcmp(s, "PAUSED")) rc_set_state(PAUSED);
         else if (!strcmp(s, "EXITING")) rc_set_state(EXITING);
@@ -62,6 +67,8 @@ namespace rc {
                     "'PAUSED', 'EXITING', or 'UNINITIALIZED'");
             return;
         }
+        }
+
     }
 
     void RCLED(const Nan::FunctionCallbackInfo<v8::Value>& info) {
@@ -77,9 +84,11 @@ namespace rc {
             Nan::ThrowTypeError("Wrong type (should be boolean or number)");
             return;
         }
-        v8::String::Utf8Value str(info[0]->ToString());
+        v8::Isolate *isolate = info.GetIsolate();
+        v8::String::Utf8Value str(isolate, info[0]);
         char * s = (char *)*str;
-        bool i = (bool)info[1]->ToBoolean()->Value();
+        
+        bool i = info[1]->BooleanValue(isolate);
         if (!strcmp(s, "GREEN")) rc_led_set(RC_LED_GREEN, i ? 1 : 0);
         else if (!strcmp(s, "RED")) rc_led_set(RC_LED_RED, i ? 1 : 0);
         else {
@@ -162,7 +171,7 @@ namespace rc {
             Nan::ThrowTypeError("Wrong type for argument 1 (should be function)");
             return;
         }
-        v8::String::Utf8Value str(info[0]->ToString());
+        Nan::Utf8String str(info[0]);
         char * s = (char *)*str;
         v8::Local<v8::Function> fn = info[1].As<v8::Function>();
         Handoff * h;
@@ -217,13 +226,14 @@ namespace rc {
                 Nan::ThrowTypeError("Wrong type for argument 0 (should be integer)");
                 return;
             }
-            int motor = (int)info[0]->ToInt32()->Value();
+            
+            int motor = Nan::To<v8::Int32>(info[0]).ToLocalChecked()->Value();
             if (motor < 1 || motor > 4) {
                 Nan::ThrowTypeError("Wrong value for argument 0 (should be 1 - 4)");
                 return;
             }
             if (info[1]->IsString()) {
-                v8::String::Utf8Value str(info[1]->ToString());
+                Nan::Utf8String str(info[1]);
                 char * s = (char *)*str;
                 if (!strcmp(s, "FREE_SPIN")) rc_motor_free_spin(motor);
                 else if (!strcmp(s, "BRAKE")) rc_motor_brake(motor);
@@ -233,7 +243,7 @@ namespace rc {
                 }
                 return;
             }
-            float duty = (float)info[1]->ToNumber()->Value();
+            float duty = Nan::To<v8::Number>(info[1]).ToLocalChecked()->Value();
             rc_motor_set(motor, duty);
             return;
         }
@@ -246,7 +256,7 @@ namespace rc {
             return;
         }
         if (info[0]->IsString()) {
-            v8::String::Utf8Value str(info[0]->ToString());
+            Nan::Utf8String str(info[0]);
             char * s = (char *)*str;
             if (!strcmp(s, "ENABLE")) rc_motor_init();
             else if (!strcmp(s, "DISABLE")) rc_motor_cleanup();
@@ -259,7 +269,7 @@ namespace rc {
             }
             return;
         }
-        float duty = (float)info[0]->ToNumber()->Value();
+        float duty = Nan::To<v8::Number>(info[0]).ToLocalChecked()->Value();
         rc_motor_set(0,duty);
     }
 
@@ -273,8 +283,8 @@ namespace rc {
                 Nan::ThrowTypeError("Wrong type for argument 1 (should be integer)");
                 return;
             }
-            int encoder = (int)info[0]->ToInt32()->Value();
-            int value = (int)info[1]->ToInt32()->Value();
+            int encoder = Nan::To<v8::Int32>(info[0]).ToLocalChecked()->Value();
+            int value = Nan::To<v8::Int32>(info[1]).ToLocalChecked()->Value();
             if (encoder < 1 || encoder > 4) {
                 Nan::ThrowTypeError("Wrong value for argument 0 (should be 1 - 4)");
                 return;
@@ -290,7 +300,7 @@ namespace rc {
             Nan::ThrowTypeError("Wrong type for argument (should be integer)");
             return;
         }
-        int encoder = (int)info[0]->ToInt32()->Value();
+        int encoder = Nan::To<v8::Int32>(info[0]).ToLocalChecked()->Value();
         int i = rc_encoder_read(encoder);
         info.GetReturnValue().Set(i);
     }
@@ -307,7 +317,7 @@ namespace rc {
         }
         rc_adc_init();
         if (info[0]->IsString()) {
-            v8::String::Utf8Value str(info[0]->ToString());
+            Nan::Utf8String str(info[0]);
             char * s = (char *)*str;
             if (!strcmp(s, "BATTERY")) value = rc_adc_batt();
             else if (!strcmp(s, "DC_JACK")) value = rc_adc_dc_jack();
@@ -320,7 +330,7 @@ namespace rc {
             info.GetReturnValue().Set(value);
             return;
         }
-        int adc = (int)info[0]->ToInt32()->Value();
+        int adc = Nan::To<v8::Int32>(info[0]).ToLocalChecked()->Value();
         if (adc < 0 || adc > 3) {
             Nan::ThrowTypeError("Wrong value (should be "\
                 "'BATTERY', 'DC_JACK' "\
@@ -335,7 +345,7 @@ namespace rc {
         int result = 0;
         if (info.Length() == 1) {
             if (info[0]->IsString()) {
-                v8::String::Utf8Value str(info[0]->ToString());
+                Nan::Utf8String str(info[0]);
                 char * s = (char *)*str;
                 if (!strcmp(s, "ENABLE")) rc_servo_init();
                 else if (!strcmp(s, "POWER_RAIL_ENABLE")) rc_servo_power_rail_en(1);
@@ -358,8 +368,8 @@ namespace rc {
                 Nan::ThrowTypeError("Wrong type for argument (should be integer)");
                 return;
             }
-            int channel = (int)info[0]->ToInt32()->Value();
-            float value = (float)info[1]->ToNumber()->Value();
+            int channel = Nan::To<v8::Int32>(info[0]).ToLocalChecked()->Value();
+            float value = Nan::To<v8::Number>(info[1]).ToLocalChecked()->Value();
             if (channel < 0 || channel > 8) {
                 Nan::ThrowTypeError("Wrong value for argument 1 (should be between 0 and 8)");
                 return;
@@ -381,7 +391,7 @@ namespace rc {
         else {
 
             rc_bmp_data_t bmp_data;
-            v8::String::Utf8Value str(info[0]->ToString());
+            Nan::Utf8String str(info[0]);
             char * s = (char *)*str;
             if (!strcmp(s, "ENABLE")) rc_bmp_init( BMP_OVERSAMPLE_1, BMP_FILTER_OFF);
             else if (!strcmp(s, "DISABLE")) rc_bmp_power_off();
@@ -418,7 +428,7 @@ namespace rc {
         else {
             rc_mpu_config_t conf = rc_mpu_default_config();
             conf.enable_magnetometer = 1;
-            v8::String::Utf8Value str(info[0]->ToString());
+            Nan::Utf8String str(info[0]);
             char * s = (char *)*str;
             if (!strcmp(s, "ENABLE")) rc_mpu_initialize(&mpu_data, conf);
             else if (!strcmp(s, "DISABLE")) rc_mpu_power_off();
@@ -465,41 +475,62 @@ namespace rc {
     }
   }
 
-    void ModuleInit(v8::Local<v8::Object> exports) {
+    NODE_MODULE_INIT(/* exports, module, context */) {
         /* Init and Cleanup */
-        exports->Set(Nan::New("initialize").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCinitialize)->GetFunction());
+        Nan::Set(exports,
+                 Nan::New("initialize").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCinitialize)).ToLocalChecked());
+    
         /* Flow State */
-        exports->Set(Nan::New("state").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCstate)->GetFunction());
-        /* LEDs */
-        exports->Set(Nan::New("led").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCLED)->GetFunction());
-        /* Buttons */
-        exports->Set(Nan::New("on").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCon)->GetFunction());
-        /* DC motors */
-        exports->Set(Nan::New("motor").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCmotor)->GetFunction());
-        /* encoders */
-        exports->Set(Nan::New("encoder").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCencoder)->GetFunction());
-        /* ADC */
-        exports->Set(Nan::New("adc").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCadc)->GetFunction());
-        /* Servo */
-        exports->Set(Nan::New("servo").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCservo)->GetFunction());
-        /* BMP */
-        exports->Set(Nan::New("bmp").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCbmp)->GetFunction());
-        /* IMU */
-        exports->Set(Nan::New("imu").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCimu)->GetFunction());
-        exports->Set(Nan::New("mpu").ToLocalChecked(),
-            Nan::New<v8::FunctionTemplate>(RCimu)->GetFunction());
-        node::AtExit(RCexit);
-    }
+        Nan::Set(exports,
+                 Nan::New("state").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCstate)).ToLocalChecked());
 
-    NODE_MODULE(roboticscape, ModuleInit);
+        /* LEDs */
+        Nan::Set(exports,
+                 Nan::New("led").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCLED)).ToLocalChecked());
+        
+        /* Buttons */
+        Nan::Set(exports,
+                 Nan::New("on").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCon)).ToLocalChecked());
+
+        /* DC motors */
+        Nan::Set(exports,
+                 Nan::New("motor").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCmotor)).ToLocalChecked());
+        
+        /* encoders */
+        Nan::Set(exports,
+                 Nan::New("encoder").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCencoder)).ToLocalChecked());
+
+        /* ADC */
+        Nan::Set(exports,
+                 Nan::New("adc").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCadc)).ToLocalChecked());
+
+        /* Servo */
+        Nan::Set(exports,
+                 Nan::New("servo").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCservo)).ToLocalChecked());
+
+        /* BMP */       
+        Nan::Set(exports,
+                 Nan::New("bmp").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCbmp)).ToLocalChecked());
+
+        /* IMU */     
+        Nan::Set(exports,
+                 Nan::New("imu").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCimu)).ToLocalChecked());
+
+        Nan::Set(exports,
+                 Nan::New("mpu").ToLocalChecked(),
+                 Nan::GetFunction(Nan::New<v8::FunctionTemplate>(RCimu)).ToLocalChecked());
+
+        Isolate* isolate = context->GetIsolate();
+        node::AddEnvironmentCleanupHook(isolate, RCexit, NULL);
+    }
 }   // namespace rc
